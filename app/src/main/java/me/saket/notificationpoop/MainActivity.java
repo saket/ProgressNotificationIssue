@@ -2,10 +2,10 @@ package me.saket.notificationpoop;
 
 import android.app.Notification;
 import android.os.Bundle;
+import android.support.v4.app.NotificationCompat;
 import android.support.v4.app.NotificationManagerCompat;
 import android.support.v4.content.ContextCompat;
 import android.support.v7.app.AppCompatActivity;
-import android.support.v7.app.NotificationCompat;
 import android.util.Log;
 import io.reactivex.Observable;
 import io.reactivex.android.schedulers.AndroidSchedulers;
@@ -27,12 +27,15 @@ public class MainActivity extends AppCompatActivity {
       progressDisposable.dispose();
       NotificationManagerCompat.from(this).cancelAll();
 
+      long downloadStartTime = System.currentTimeMillis();
+      int notificationId = 123;
+
       progressDisposable = streamProgress()
-          .observeOn(AndroidSchedulers.mainThread())
+          //.sample(200, TimeUnit.MILLISECONDS, true /* emitLast */)
           .subscribe(
               progress -> {
                 Log.i(TAG, "Progress: " + progress);
-                updateProgressNotification(progress, 123);
+                updateProgressNotification(progress, notificationId, downloadStartTime);
               },
               error -> error.printStackTrace()
           );
@@ -41,19 +44,19 @@ public class MainActivity extends AppCompatActivity {
 
   private Observable<Integer> streamProgress() {
     return Observable.range(0, 101)
-        .zipWith(Observable.interval(25, TimeUnit.MILLISECONDS), (progress, delay) -> progress);
+        // Add a delay to every emission. Observable#delay() cannot be used here.
+        .zipWith(Observable.interval(25, TimeUnit.MILLISECONDS, AndroidSchedulers.mainThread()), (progress, delay) -> progress);
   }
 
-  private void updateProgressNotification(int progress, int notificationId) {
+  private void updateProgressNotification(int progress, int notificationId, long downloadStartTime) {
     Notification notification = new NotificationCompat.Builder(this)
         .setContentTitle("Saving image")
         .setContentText(progress + "%")
         .setSmallIcon(android.R.drawable.stat_sys_download)
-        .setWhen(0)
+        .setWhen(downloadStartTime)
         .setColor(ContextCompat.getColor(this, R.color.colorAccent))
         .setProgress(100 /* max */, progress, false /* indeterminateProgress */)
         .build();
-
     NotificationManagerCompat.from(this).notify(notificationId, notification);
   }
 }
